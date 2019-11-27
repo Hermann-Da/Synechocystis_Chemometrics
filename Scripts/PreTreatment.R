@@ -13,116 +13,104 @@ Version <- 000            # Versionsnummer für die Nachverfolgung, nicht verän
 #########################
 ### Import
 #########################
+# Gruppen <- string vector of the used groups
+# must be part of the file name and be excplicit
 
-Data <- My.Import(Location = "./Raw_data/191030_InSitu_PHB_192",Gruppen = c("A","B")) # Eindeutige Bennenung, in den File Namen vorhanden
-levels(Data$Groups) <- c("0.805","8.558","8.596")
-# Data <- My.Import(Location = "./Raw_data/6803",Gruppen = c("6A","6B","6C","6D"))
-Data$PHB <- read.csv("./Raw_data/191030_InSitu_PHB_192/PHB_Mean_0.TXT",
-                     sep = ",", dec = ".", header = FALSE)
-Data$PHB <- as.numeric(Data$PHB[,2])
-### Ersetzen der Namen der Levels für eine Publikation
-levels(Data$Groups) <- c("A","B","C")
+Data <- My.Import(Location = "./Raw_data",Gruppen = c("A","B")) 
 
-# Welche Vorbehandlungen gibt es
+# Replace the names of the levels, for example for a publication
+levels(Data$Groups) <- c("Strain A", "Strain B")
+
+# Which preTreatment are available
 Type <- c("Spectra","Spectra_b", "Spectra_d", "Spectra_SNV", "Spectra_n", "Spectra_norm" )
 
 #########################
-### Festlegen der Default Darstellungsgrenzen und plotten der Originaspektren
+### Setting of the visualization parameter
 #########################
 
-# Was wird dargestellt
+# What is shown
 Range <- c(max(Data$Wavenumber),min(Data$Wavenumber))
-# Welche Wellenzahlen werden ausgewählt
+# Which wavennumbers are chosen
 Sample <- c(1:length(Data$Wavenumber))
+
+#########################
+### Plot Original spectra
+#########################
 
 # My.export_start("Spectra_Original")
 
 plot.spectra(Liste = Data,Spektren = "Spectra", area = Range)
 
-# Legende dazugeben, Über ersten parameter die Position verändern
+# add legend, adjust position by modifying the first parameter
 
-legend("topleft", legend=unique(Data$Groups), pch=16, col=unique(Data$Groups), inset = 0.05, bty = "n")
- abline(v = 250, lty = "dashed")
- abline(v = 100, lty = "dashed")
+legend("topright", legend=unique(Data$Groups), pch=16, col=unique(Data$Groups), inset = 0.05, bty = "n")
 
 # My.export_end()
 
 #########################
-### Normierung
+### Normalizing
 #########################
-# Position = Wellenzahl an der man normieren will
+# Position = Wavenumber or area used as reference for the normalization
+# Spektren <- which pretreated spectra are used 
 
-Data$Spectra_norm <- Spec_norm(List = Data, Spektren = Type[1], Position = c(100,250))
+Data$Spectra_norm <- Spec_norm(List = Data, Spektren = Type[1], Position = c(1550,1500))
 
-#Data$Spectra_norm <- msc(as.matrix(Data$Spectra_b))
 
 #########################
 ### Baseline-correction
 #########################
-# Degree = Ordnung des zur Korrekutr verwendeten Polynoms
+# Degree = order of the used polynomial 
+
+Select <- 1
 
 Baseline <- baseline(spectra = as.matrix(Data[[Type[Select]]]),method = 'modpolyfit',degree = 1)
 # plot(Baseline)
-# Extrahierung der korrigierten Spektren
+# Extraction of the corrected spectra
 Data$Spectra_b <- as.data.frame(getCorrected(Baseline))
+colnames(Data$Spectra_b) <- colnames(Data$Spectra)
 # Baseline wieder entfernen
 rm(Baseline)
 
 #############################################
-#1.Ableitung & smoothing
+# Derivative and smoothing (SyitzkyGolay)
 #############################################
-# m = Wievielte Ableitung 
-# w = Intervall über dem abgeleitet wird
-# s = Intervall über dem das Smoothing durchgeführt wird
+# m = Order of the derivative
+# p = order of the used polynomial 
+# w = Window used for the derivative
+# delta.wav = optional vector used for smoothing
 
-Data$Spectra_d <- as.data.frame(gapDer(DData[[Type[Select]]][,Sample], m = 1,
-                                 w = 5, s = 3))
-# Wavenumber auf selbe Länge wie bei den abgeleiteten Spektren bringen 
-# Bei 2. Ableitung, doppelte Anzahl entfernen und so weiter
-
-# Data$Wavenumber_d <- Data$Wavenumber[-c(1:5,length(Data$Wavenumber)-(0:4))]
-
-# Sample anpassen 
-# Sample_d <- c(1:length(Data$Wavenumber_d))
+Data$Spectra_d <- as.data.frame(savitzkyGolay(Data[[Type[Select]]][,Sample], m = 1, p = 2, w = 5, delta.wav = 5))
 
 #############################################
-#Spektren vorbehandlung mit Standardnormalvarianz
-#############################################
-# Data$Spectra_b = basislinien korrigierte Spektren vorbehandeln
-# Data$Spectra   = Originalspektren vorbehandeln
-
-Data$Spectra_SNV <- standardNormalVariate(Data$Spectra_b[Sample])
-
-#############################################
-#Spektren vorbehandlung mit Detrend (Smoothing und Polynom 2. Ordnung fitting)
+# SNV - Transformation
 #############################################
 
-Data$Spectra_n <- detrend(Data$Spectra[,Sample], wav = Data$Wavenumber[Sample])
-Data$PHB_n <- detrend(Data$PHB[Sample], wav = Data$Wavenumber[Sample])
+Data$Spectra_SNV <- standardNormalVariate(Data[[Type[Select]]][,Sample])
 
-Data$Wavenumber_SNV <- as.numeric(colnames(Data$Spectra_n))
 #############################################
-# Spektren plotten
+# detrend = Fitting a 2nd order polynomial and applying a SNV correction
 #############################################
 
-Type <- c("Spectra","Spectra_b", "Spectra_d", "Spectra_SNV", "Spectra_n", "Spectra_norm" )
+Data$Spectra_n <- detrend(Data[[Type[Select]]][,Sample], 
+                          wav = as.numeric(colnames(Data[[Type[Select]]][,Sample])))
 
-# Welche werden ausgewählt
-Select <- 5
+#############################################
+# Plot differenly treated spectra
+#############################################
+
+# Which treatments are available
+Type <- c("Spectra","Spectra_norm" , "Spectra_b", "Spectra_d", "Spectra_SNV", "Spectra_n")
+
+# Which treatment is chosen
+Select <- 6
 
 # My.export_start(Type[Select])
 
 plot.spectra(Data, Type[Select],area = Range)
-legend("topleft", legend=levels(Data$Groups[!is.na(Data$Groups)]), pch=16, 
+
+legend("topright", legend=levels(Data$Groups[!is.na(Data$Groups)]), lty = "solid", 
        col=unique(Data$Groups[!is.na(Data$Groups)]), inset = 0.001, bty = "n",
        horiz = FALSE)
-lines(x = as.numeric(colnames(Data$Spectra_n)), y= Data$PHB_n, col = "royalblue")
- # abline(v = 900, lty = "dashed") # Darstellen welche Bereiche zur PCA verwendet wurden
- # abline(v = 1280, lty = "dashed")
- # arrows(x0 = c(1515,1152,1005,955,875), # Mit Pfeilen wichtige Peaks vermerken
- #        x1 = c(1515,1152,1005,955,875),
- #        y0 = c(-0.6,-0.6,-1.1,1.1,0.8), y1 = c(0.0,0.0,-0.5,0.5,0.2),
- #        code = 2, col = "darkgreen", lwd = 1.3, length = 0.1) #code = 2 -> pfeil an y1
 # My.export_end()
 
 

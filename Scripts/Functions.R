@@ -10,26 +10,28 @@ for (p in 1:length(Packages)) {
   test <- require(Packages[p], character.only = TRUE) #loads package or exports false 
   if(test == FALSE){
     install.packages(Packages[p]) #installiert Packages wenn nicht vorhanden
-    library(Packages[p])
+    library(Packages[p], character.only = TRUE)
+  }else{
+    library(Packages[p],character.only = TRUE)
   }
 }
 
-# Entfernen von Variablen um das Environment zu reduzieren
+# Remove variables to keep the environment clear
 rm(test) 
 rm(Packages)
 rm(p)
 
 
 #########################
-##Import Funktion
+##Import Function
 #########################
-# Location: Der Pfad zu den Txt. files
-# Gruppen: String Vektor der Gruppennamen (MÃ¼ssen in den File namen vorkommen)
-# Maximal 8 Gruppen sind farbtechnisch moeglich 
+# Location: Path, where the TXT.files are located
+# Gruppen: string vector of the used groups, must be part of file name and be explicit
+# A maximum of 8 groups is possible based on the available colours
 
 My.Import <- function(Location = "./Raw_data", Gruppen = Files) {
   
-  #Liste von Txt. Files in Location
+  # List of the TXT.files in location
   Files <- list.files(path = Location, pattern = ".TXT")
   Files1 <- c()
   for (x in 1:length(Gruppen)) {
@@ -40,115 +42,115 @@ My.Import <- function(Location = "./Raw_data", Gruppen = Files) {
     start <- getwd() ##store Start wd
     setwd(Location) ### setwd to Data file
     
-    df <- try(read.csv(data, header = FALSE, ##data als Funktionsparameter und hier
-                       sep = ",",           ## df ist ein Zwischenspeicher    
-                       dec = "." ))          ## Try um Fehler zu Ã¼berspielen
+    df <- try(read.csv(data, header = FALSE, 
+                       sep = ",",              
+                       dec = "." ))         
     setwd(start) ## back to normal
-    return(df)  ###Speicher in Variable Ã¼bertragen
+    return(df)  ### Output = df
   }
   
-  #Auslesen der Dateien
+  # Import of the files
   Raw.list <- lapply(Files1,import)
   
-  #Liste an Dataframes in einen Ã¼berfÃ¼hren
+  # combine list of data frames 
   Raw.data <- do.call("cbind", Raw.list)
   
-  # Wellenzahlen entfernen
+  # Remove wavenumbers
   Spectra <- as.data.frame(t(Raw.data[,-c(which(colnames(Raw.data) == "V1"))]))
   
-  # Wellenzahlen extrahieren und als Colnames setzen
+  # Extract wavenumbers and set as column names
   Wavenumber <- as.numeric(Raw.data[,1])
   colnames(Spectra) <- Wavenumber
   
-  ###Ueberpruefen ob ein Gruppenvektor vorhanden ist, sonst Filenamen nehmen
+  ### Test for a Gruppen vector, else the files are organised according to files vector
   if(Gruppen[1] != Files1[1]){
-    ##### Gruppenvektor erstellen
+    ##### construct Groups vector
     Groups <- c(1:length(Files1))
     for (i in 1:length(Gruppen)){
-      Pos <- c(grep(pattern = as.character(Gruppen[i]), x = Files1)) ##grep erkennt Bestandteile von Filenamen
-      Groups[Pos] <- Gruppen[i] ###FÃ¼llt Vektor auf
+      Pos <- c(grep(pattern = as.character(Gruppen[i]), x = Files1)) ##grep recognizes patterns in file names
+      Groups[Pos] <- Gruppen[i] # appends vector
     }
   }else{
     Groups <- sub(pattern = ".TXT",x= Gruppen, replacement = "")
   }
-  #####Erstelle eine Liste mit Gruppen, Wavenumber, Spektren
+  ##### Creation of a list containig spectra, wavenumbers and Groups 
   ###Zur Besseren Organisation
   OriginalData <- list(Wavenumber,Spectra,as.factor(Groups))
   
   names(OriginalData) <- c("Wavenumber","Spectra","Groups")
   
+  # Output = list
   return(OriginalData)
 }
 
 
 #########################
-##Export Funktion fÃ¼r png Export
+## Export fucntion (png format)
 #########################
-# Resolutiondefault =  600 DPI
-# title = Genauere Bezeichnung der Grafik (String), z.B.: "Loadings"
-# Der File name wird erweitert um die Projektbezeichnung und die version (Siehe Dokumentation script)
+# Default for resolution = 600 DPI
+# title = Precise definition of the graphs, for example "Loadings"
+# The file name is appended by the project name and the version number (c.f. Documentation script)
 
-# Vor der zu exportierenden Grafik positionieren
+# Position in front of the graphs
 My.export_start <- function(title) {
   setwd("./Graphs")
   png(filename = paste(title,Project,Version,".png", sep = ""), 
          height = 11, width = 15, units = "cm",
-         res = 600, pointsize = 9) ##Fuer Power Point -> Pointsize auf ca. 11 stellen
+         res = 600, pointsize = 9) # for a power point presentation, set to around 11
 }
 
-# Nach der zu exportierenden Grafik positionieren
+# Position after the graphs
 My.export_end <- function() {
-  dev.off()  # Beendet Export
-  setwd("../") # working directionary zurÃ¼ck auf default
+  dev.off()  # Finishes export
+  setwd("../") # Working directionary back to default 
 }
 
 #########################
-#Hierarchical clustering analysis
+# Hierarchical clustering analysis
 #########################
-# Data = Matrix der Daten (Variablen in columns, Proben in rows)
+# Data = Matrix of data (Variables in columns, samples in rows)
 # Groups = Vektor der Gruppierung der Daten 
 
 HCA <- function(Data,Groups) {
-  d <- dist(Data,method = "euclidean") #Distanzmatrix erzeugen
-  hca <- hclust(d, method = "ward.D2") #Histogramm erstellen
-  ##Gruppen und Farben bestimmen
-  dend <- as.dendrogram(hca) #FÃ¼rs dendextend-package verwendbar machen
-  colors_to_use <- as.numeric(Groups)[order.dendrogram(dend)] #Farben mit der Ordnung des Histograms speichern
-  Label <- Groups #Labels erstellen
-  labels_colors(dend) <- colors_to_use # Labels einfÃ¤rben
-  labels(dend) <- Label[order.dendrogram(dend)] #Labels ordnen 
-  plot(dend, font.lab = 2, ylab = "Heterogenity") #plot
+  d <- dist(Data,method = "euclidean") # create distance matrix
+  hca <- hclust(d, method = "ward.D2") # construct histogram
+  ## define colours and groups
+  dend <- as.dendrogram(hca) # Transform into a format accessable by dendextend
+  colors_to_use <- as.numeric(Groups)[order.dendrogram(dend)] # store colours according to the order of the histogram
+  Label <- Groups # create labels
+  labels_colors(dend) <- colors_to_use # colour labels
+  labels(dend) <- Label[order.dendrogram(dend)] # order labels 
+  plot(dend, font.lab = 2, ylab = "Heterogenity") # plot
   
 }
 
 #########################
-#Loadings plotten 
+# Plot loadings
 #########################
-# Plottet nacheinander alle angegebenen PCS
-# Default sind die ersten 3 PCs
-# Variab = Vektor der verwendeten Wellenzahlen
-# Load = PCA object, dessen Loadings geplottet werden sollen
-# PCs = String vektor der zu plottenden Principal Components, default sind PC1 bis 3
-# 
+# Plots the chosen principal components (PCs) in sequence
+# Variab = Vector of the used spectral area
+# Load = PCA object, which loadings are to be plotted
+# PCs = String vektor detailing the PCs used for plotting
+# Default: first three PCs
 
 plot.load <- function(Variab = as.numeric(colnames(Data[[Type[Stats]]][,Sample])), Load = PCA,PCs = c("PC1","PC2","PC3")){
   
-  Variance <- Load$sdev^2/sum(Load$sdev^2) # Berechnung der erklÃ¤rten varianz pro PC
+  Variance <- Load$sdev^2/sum(Load$sdev^2) # Calcualtion of the explained variance per component
   
   if(length(colnames(Data[[Type[Stats]]])) == length(Sample)){
     Variab <- as.numeric(colnames(Data[[Type[Stats]]]))
   }else{
     Variab <- as.numeric(colnames(Data[[Type[Stats]]][,Sample]))
   }
-# Schleifenfunktion arbeitet die PCs ab  
+# Loop function plots all specified components
   for (i in 1:length(PCs)) {
     plot(x= Variab, y = Load$rotation[,PCs[i]],
          type = "l", xlab = "Wavenumber [1/cm]",
-         ylab = paste("Loadings of",PCs[i], "[",round(Variance[i]*100,1),"%]", sep = " "), # ErklÃ¤rte Varianz wird in der y- Achse vermerkt 
+         ylab = paste("Loadings of",PCs[i], "[",round(Variance[i]*100,1),"%]", sep = " "), # explained variance is noted in the Y-axis label 
          font = 2,font.lab = 2,
          lab = c(20,15,10),
          col = "dimgrey",xlim = c(max(Variab),min(Variab)), xaxs = "i", bty = "l")
-    abline(h = 0, lwd = 0.8, lty = "dashed") # Null Linie einfÃ¼gen zur besseren Interpretation
+    abline(h = 0, lwd = 0.8, lty = "dashed") # Indicate zero line for an easier interpretation 
     grid(lwd = 0.8)
   }
   
@@ -156,28 +158,29 @@ plot.load <- function(Variab = as.numeric(colnames(Data[[Type[Stats]]][,Sample])
 
 
 #########################
-# Scores plotten
+# Plot scores
 #########################
-# Maximal 8 Gruppen
+# Maximum of 8 groups
+# Input = Raw Data (format = List)
+# Result = PCA object, which scores are to be plotted
+# PCs = which PCs are to be used
 
 plot.scores <- function(Input = Data, Result = PCA, PCs = c(1,2)) {
 
-    x_Ax <- PCs[1]
-    Y_Ax <- PCs[2]
-    
+ # Vector specifying the forms used during the plotting
   Form <- c(15,20,17,18,3,4,6,8)
   
-  plot(NULL,xlab = paste("Scores of", "PC",X_Ax, "[",round(Input$Variance[X_Ax]*100,1),"%]", sep = " "),
-       ylab = paste("Scores of","PC" ,Y_Ax, "[",round(Input$Variance[Y_Ax]*100,1),"%]", sep = " "),
+  plot(NULL,xlab = paste("Scores of", "PC",PCs[1], "[",round(Input$Variance[PCs[1]]*100,1),"%]", sep = " "),
+       ylab = paste("Scores of","PC" ,PCs[2], "[",round(Input$Variance[PCs[2]]*100,1),"%]", sep = " "),
        col = Input$Groups[!is.na(Input$Groups)], lab = c(10,10,10),
-       font.lab = 2, font = 2, xlim = c(min(Result$x[,X_Ax]),max(Result$x[,X_Ax])),
-       ylim = c(min(Result$x[,Y_Ax]),max(Result$x[,Y_Ax]))
+       font.lab = 2, font = 2, xlim = c(min(Result$x[,PCs[1]]),max(Result$x[,PCs[1]])),
+       ylim = c(min(Result$x[,PCs[2]]),max(Result$x[,PCs[2]]))
   )
   grid(lwd = 0.8)
   abline(h = 0, v = 0)
   for(g in 1:length(levels(Result$Groups))){
-    points(x = Result$x[which(Result$Groups == levels(Result$Groups)[g]),X_Ax],
-           y = Result$x[which(Result$Groups == levels(Result$Groups)[g]),Y_Ax],
+    points(x = Result$x[which(Result$Groups == levels(Result$Groups)[g]),PCs[1]],
+           y = Result$x[which(Result$Groups == levels(Result$Groups)[g]),PCs[2]],
            pch = Form[g], col = unique(Result$Groups)[g])
   }
   
@@ -187,19 +190,19 @@ plot.scores <- function(Input = Data, Result = PCA, PCs = c(1,2)) {
 
 
 #########################
-#Spektren plotten 
+# plot Spectra
 #########################
-# Liste = Datenliste mit Wavenumber, Spectra, Groups
-# Spektren = Welche Spektren sollen geplottet werden
-# Wellenzahl = Vektor der Wellenzahlen
-# area = Welcher Bereich soll geplottet werden
-# Code = Faktor vektor, ordnet die Farben zu 
-# Bereich = Welche Wellenzahlen werden ausgewÃ¤hlt
+# Liste = List containig spectra, wavenumbers and Groups 
+# Spektren = Which spectra should be plotted (String)
+# Wellenzahl = Vector of the used spectral area
+# area = Which are should be shown
+# Code = Order for the colours used
+# Bereich = Which area should be used 
 
 plot.spectra <- function(Liste,Spektren,area = c(max(Wellenzahl),min(Wellenzahl)), 
                          Code = Liste$Groups[!is.na(Liste$Groups)], 
                          Bereich = c(1:length(colnames(Liste[[Spektren]])))){
-  # Spektren abspeichern 
+  # Store relevant spectra
   X <- Liste[[Spektren]][!is.na(Liste$Groups),Bereich]
   
   matplot(x = as.numeric(colnames(X)),
@@ -212,11 +215,11 @@ plot.spectra <- function(Liste,Spektren,area = c(max(Wellenzahl),min(Wellenzahl)
 }
 
 #########################
-#Spektren auf Peaks normieren 
+# Normalize Spectra by a peak or area
 #########################
-# List = Liste aus der genommen wird, z.B.: Data
-# Spektren = Welche Spektren normiert werden sollen
-# Position = Welches Intervall bzw. welche Wellenzahl
+# List = List containig spectra, wavenumbers and Groups 
+# Spektren = Which spectra should be plotted (String)
+# Position = Which intervall or spectral range
 
 Spec_norm <- function(List = Data, Spektren = "Spectra",Wellenzahl = Data$Wavenumber, Position){
     X <- List[[Spektren]]

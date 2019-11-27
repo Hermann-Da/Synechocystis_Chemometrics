@@ -1,35 +1,35 @@
 #############################################
-# Vorbehandlung auswählen
+# Chose pretreated spectra
 #############################################
 
-# Welche Vorbehandlungen gibt es
-Type <- c("Spectra","Spectra_b", "Spectra_d", "Spectra_SNV", "Spectra_n", "Spectra_norm" )
-# Welche werden ausgewählt
-Stats <- 5
+# Which preTreatment are available
+Type <- c("Spectra","Spectra_norm" , "Spectra_b", "Spectra_d", "Spectra_SNV", "Spectra_n")
+# Which are chosen
+# Stats <- 5
 
-# Wenn die abgeleiteten Spektren verwendet werden
-# Sample <- Sample_d
+# If the complete area is used
+# Sample <- 1:length(colnames(Data[[Type[Stats]]]))
 
 #########################
 # PCA 
 #########################
-# Scale = TRUE, damit wird die Korrelationsmatrix verwendet
-# Scale = FALSE, damit wird die Kovarianzmatrix verwendet
+# Scale = TRUE, Correlation matrix is used
+# Scale = FALSE, Covarianz matrix is used 
 
 
 PCA <- prcomp(Data[[Type[Stats]]][!is.na(Data$Groups),Sample],
                   center = TRUE,rank.=5, scale. = FALSE )
 
-# Damit "NAs" entfernen, um die Farben richtig darzustellen
+# Remove NAs to display correct colours
 PCA$Groups <- Data$Groups[!is.na(Data$Groups)]
 
 summary(PCA)
 
 ######################
-# Erklärte Varianz pro Principal Component
+# Explaine Variance per PC
 #####################
 
-# Varianz ausgeben
+# Store Variance
 Data$Variance <- PCA$sdev^2/sum(PCA$sdev^2)
 
 
@@ -46,7 +46,7 @@ grid(lwd = 0.8)
 
 
 ########################
-# Loadings ausgeben
+# Plot loadings
 #######################
 
 # My.export_start(paste("Loadings_PC2",Type[Stats], sep = " "))
@@ -56,7 +56,7 @@ plot.load()
 # My.export_end()
 
 #####################
-# Scorewerte plotten, überblicksmäßig
+# Plot scores of first 4 Components, general overview
 #####################
 
 
@@ -70,11 +70,14 @@ legend("bottomright", legend=levels(Data$Groups[!is.na(Data$Groups)]), pch=19,
 #My.export_end()
 
 #####################
-# Plotten der ScoreWerte einzelner PCA's
+# Plot specific PCs
 ####################
+# Vector specifying the forms used during the plotting
+Form <- c(15,20,17,18,3,4,6,8)
 
+# Which are to be plotted
 PC <- c(1,2)
-Choice <- 2
+
 # My.export_start(paste("Scores_1_2",Type[Stats], sep = " "))
 plot.scores(PCs = PC)
 
@@ -84,45 +87,57 @@ legend("topleft", legend=levels(PCA$Groups),
 # My.export_end()
 
 ###################################
-# Ausreißer identifizieren mit identify
+# Identify outliers
 ###################################
-# Entkommentieren und ausführen, gibt Indexzes der gewählten Punkte aus
+# Decomment and run, returns locators of selected points
 
-# Ausreißer = identify( x = PCA$x[,X_Ax], y = PCA$x[,Y_Ax])
+# Outlier = identify( x = PCA$x[,PC[1]], y = PCA$x[,PC[2]])
 
 
 ###################################
 # Visualization of Scores with Boxplots
 ###################################
-# Stichprobenumfang einbauen
+
+# Which Component should be used
+Choice <- 1
 
 # My.export_start(paste("Boxplot_PC2_Publ",Type[Stats], sep = " "))
 
-boxplot(PCA$x[,PC[Choice]] ~ PCA$Groups, 
+boxplot(PCA$x[,Choice] ~ PCA$Groups, 
         xlab = paste("Cultures,","n=",floor(length(Data$Groups)/length(levels(Data$Groups))), sep = " "),
-        ylab = paste("Scores of","PC" ,Choice, "[",round(Data$Variance[PC[Choice]]*100,2),"%]", sep = " "), 
+        ylab = paste("Scores of","PC" ,Choice, "[",round(Data$Variance[2]*100,2),"%]", sep = " "), 
           cex.lab = 1.2, cex.axis = 1.2, yaxt = "n", font.lab = 2)
-abline(h = seq(from = round(min(PCA$x[,PC[Choice]])), to = round(max(PCA$x[,PC[Choice]])), by = 2), col = "darkgrey", lty = "dashed")
+abline(h = seq(from = round(min(PCA$x[,Choice])), to = round(max(PCA$x[,Choice])), by = 2), col = "darkgrey", lty = "dashed")
 abline(h = 0, col = "black", lty = "solid")
-axis(2,at = seq(from = round(min(PCA$x[,PC[Choice]])), to = round(max(PCA$x[,PC[Choice]])),by = 2), cex.axis = 1.2)
+axis(2,at = seq(from = round(min(PCA$x[,Choice])), to = round(max(PCA$x[,Choice])),by = 2), cex.axis = 1.2)
 # My.export_end()
 
 ###################################
 # Univariant statistics
 ###################################
 
-# # ANOVA to test for general signigicance
+#######
+# If variance homogenity is TRUE
+######
+# ANOVA to test for general signigicance
 # summary(aov(PCA$x[,2]~ PCA$Groups))
-# # Test for statistical differences 
+
+# Test for statistical differences 
 # TukeyHSD(aov(PCA$x[,2]~ PCA$Groups))
 
+#######
+# If variance homogenity is not given or FALSE
+######
+
 # Kruskal wallis test for general significance
-print(kruskal.test(PCA$x[,Y_Ax]~ PCA$Groups))
-# Games-Howell Algorithm for each group
-# Levene test um diew Variance homogentity zu überprüfen
-Games <- posthocTGH(y = PCA$x[,Y_Ax], x = PCA$Groups, method = "games-howell")
+print(kruskal.test(PCA$x[,Choice]~ PCA$Groups))
+# Games-Howell Algorithm tests for differences between each group
+
+# Levene to test for variance homogenity
+Games <- posthocTGH(y = PCA$x[,Choice], x = PCA$Groups, method = "games-howell")
 print(Games)
 rm(Games)
+
 ###################################
 # Hierarchical clustering Analysis
 ###################################
@@ -131,18 +146,18 @@ rm(Games)
 
 
 HCA(Data[[Type[Stats]]][!is.na(Data$Groups),],Data$Groups[!is.na(Data$Groups)])
-legend("topright", legend=levels(Data$Groups[!is.na(Data$Groups)]), 
-       pch=16, col=unique(Data$Groups[!is.na(Data$Groups)]), inset = 0.01, bty = "n")
+legend("topright", legend=levels(PCA$Groups), 
+       pch=16, col=unique(PCA$Groups), inset = 0.01, bty = "n")
 
 #My.export_end()
 
 ###################################
-# PCA und Hierarchical clustering Analysis
+# PCA and Hierarchical clustering Analysis of the score values
 ###################################
 
 #My.export_start(paste("PCA_HCA",Type[Stats], sep = " "))
 
-HCA(Data = PCA$x[,2:3],Groups = Data$Groups[!is.na(Data$Groups)])
-legend("topright", legend=levels(Data$Groups[!is.na(Data$Groups)]), 
-       pch=16, col=unique(Data$Groups[!is.na(Data$Groups)]), inset = 0.01, bty = "n")
+HCA(Data = PCA$x[,Choice],Groups = PCA$Groups)
+legend("topright", legend=levels(PCA$Groups), 
+       pch=16, col=unique(PCA$Groups), inset = 0.01, bty = "n")
 #My.export_end()
